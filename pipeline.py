@@ -31,27 +31,18 @@ if StrictVersion(seesaw.__version__) < StrictVersion('0.8.5'):
 ###########################################################################
 # Find a useful Wget+Lua executable.
 #
-# WGET_LUA will be set to the first path that
+# WGET_AT will be set to the first path that
 # 1. does not crash with --version, and
 # 2. prints the required version string
-WGET_LUA = find_executable(
+WGET_AT = find_executable(
     'Wget+Lua',
+    ['GNU Wget 1.20.3-at.20201030.01'],
     [
-        'GNU Wget 1.14.lua.20130523-9a5c',
-        'GNU Wget 1.14.lua.20160530-955376b'
-    ],
-    [
-        './wget-lua',
-        './wget-lua-warrior',
-        './wget-lua-local',
-        '../wget-lua',
-        '../../wget-lua',
-        '/home/warrior/wget-lua',
-        '/usr/bin/wget-lua'
+        './wget-at',
     ]
 )
 
-if not WGET_LUA:
+if not WGET_AT:
     raise Exception('No usable Wget+Lua found.')
 
 
@@ -60,7 +51,7 @@ if not WGET_LUA:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20191114.01'
+VERSION = '20201110.01'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'tracker.archiveteam.org'
@@ -161,7 +152,7 @@ def stats_id_function(item):
 class WgetArgs(object):
     def realize(self, item):
         wget_args = [
-            WGET_LUA,
+            WGET_AT,
             '-U', USER_AGENT,
             '-nv',
             '--no-cookies',
@@ -183,8 +174,10 @@ class WgetArgs(object):
             '--waitretry', '30',
             '--warc-file', ItemInterpolation('%(item_dir)s/%(warc_file_base)s'),
             '--warc-header', 'operator: Archive Team',
-            '--warc-header', 'kinja-dld-script-version: ' + VERSION,
+            '--warc-header', 'x-wget-at-project-version: ' + VERSION,
+            '--warc-header', 'x-wget-at-project-name: ' + TRACKER_ID,
             '--warc-header', ItemInterpolation('kinja-item: %(item_name)s'),
+            '--warc-dedup-url-agnostic',
         ]
 
         item_name = item['item_name']
@@ -196,11 +189,13 @@ class WgetArgs(object):
 
         if item_type == 'site':
             base = re.search(r'([^\.]+\.[^\.]+)$', item_value).group(1)
+            if base != 'kinja.com':
+                base += ',kinja.com'
             wget_args.extend(['--domains', base])
-            wget_args.extend(['--warc-header', 'kinja-blog: ' + item_value])
+            wget_args.extend(['--warc-header', 'x-wget-at-project-item-name: '+item_value])
+            wget_args.append('https://' + item_value + '/')
             wget_args.append('https://' + item_value + '/robots.txt')
             wget_args.append('https://' + item_value + '/sitemap.xml')
-            wget_args.append('https://' + item_value + '/')
         else:
             raise Exception('Unknown item')
 
@@ -219,10 +214,10 @@ class WgetArgs(object):
 # This will be shown in the warrior management panel. The logo should not
 # be too big. The deadline is optional.
 project = Project(
-    title = 'gfycat',
+    title = 'kinja',
     project_html = '''
-    <img class="project-logo" alt="logo" src="https://www.archiveteam.org/images/5/54/Gfycat-logo.png" height="50px"/>
-    <h2>gfycat.com <span class="links"><a href="https://gfycat.com/">Website</a> &middot; <a href="http://tracker.archiveteam.org/gfycat/">Leaderboard</a></span></h2>
+    <img class="project-logo" alt="logo" src="hhttps://archiveteam.org/images/a/af/Kinja-icon.png" height="50px"/>
+    <h2>kinja.com <span class="links"><a href="https://kinja.com/">Website</a> &middot; <a href="http://tracker.archiveteam.org/kinja/">Leaderboard</a></span></h2>
     '''
 )
 
@@ -230,7 +225,7 @@ pipeline = Pipeline(
     CheckIP(),
     GetItemFromTracker('http://%s/%s' % (TRACKER_HOST, TRACKER_ID), downloader,
         VERSION),
-    PrepareDirectories(warc_prefix='gfycat'),
+    PrepareDirectories(warc_prefix='kinja'),
     WgetDownload(
         WgetArgs(),
         max_tries=2,

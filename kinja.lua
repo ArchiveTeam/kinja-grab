@@ -1,9 +1,10 @@
 dofile("table_show.lua")
 dofile("urlcode.lua")
-JSON = (loadfile "JSON.lua")()
+local urlparse = require("socket.url")
+local http = require("socket.http")
 
-local item_type = os.getenv('item_type')
 local item_value = os.getenv('item_value')
+local item_type = os.getenv('item_type')
 local item_dir = os.getenv('item_dir')
 local warc_file_base = os.getenv('warc_file_base')
 
@@ -13,19 +14,12 @@ local downloaded = {}
 local addedtolist = {}
 local abortgrab = false
 
-local ids = {}
-local discovered = {}
-
 for ignore in io.open("ignore-list", "r"):lines() do
   downloaded[ignore] = true
 end
 
-load_json_file = function(file)
-  if file then
-    return JSON:decode(file)
-  else
-    return nil
-  end
+if urlparse == nil or http == nil then
+  abortgrab = true
 end
 
 read_file = function(file)
@@ -41,8 +35,7 @@ end
 
 allowed = function(url, parenturl)
   if string.match(url, "'+")
-      or string.match(url, "[<>\\%*%$;%^%[%]%(%){}]")
-      or string.match(url, "^https?://i%.kinja%-img%.com.*/$") then
+    or string.match(url, "[<>\\%*%$;%^%[%],%(%){}]") then
     return false
   end
 
@@ -57,7 +50,7 @@ allowed = function(url, parenturl)
     tested[s] = tested[s] + 1
   end
 
-  if string.match(url, "%?startTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+&endTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+$") then
+--[[  if string.match(url, "%?startTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+&endTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+$") then
     local start_time, end_time = string.match(url, "%?startTime=([0-9%-T:]+)&endTime=([0-9%-T:]+)$")
     start_time = string.gsub(start_time, "[%-T:]", "")
     end_time = string.gsub(end_time, "[%-T:]", "")
@@ -67,10 +60,11 @@ allowed = function(url, parenturl)
   if parenturl ~= nil and string.match(parenturl, "%?startTime=[0-9%-T:]+&endTime=[0-9%-T:]+$") then
     downloaded[url] = true
     return false
-  end
+  end]]
 
   if string.match(url, "^https?://([^/]+)") == item_value
-      or string.match(url, "^https?://[^/]*kinja%-img%.com/") then
+    or string.match(url, "^https?://[^/]*kinja%-img%.com/")
+    or string.match(url, "^https?://[^/]*akamaihd%.net/") then
     return true
   end
 
@@ -81,26 +75,22 @@ wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_pars
   local url = urlpos["url"]["url"]
   local html = urlpos["link_expect_html"]
 
-  if string.match(url, "[<>\\%*%$;%^%[%],%(%){}\"]") then
-    return false
-  end
-
-  if (downloaded[url] ~= true and addedtolist[url] ~= true)
+--[[  if (downloaded[url] ~= true and addedtolist[url] ~= true)
       and not (string.match(url, "^https?://[^/]*kinja%-img%.com/") and downloaded[string.lower(url)])
       and not (string.match(url, "/$") and downloaded[string.match(url, "^(.+)/$")])
       and (allowed(url, parent["url"]) or html == 0) then
     addedtolist[url] = true
 print(url)
     return true
-  end
-  
+  end]]
+
   return false
 end
 
 wget.callbacks.get_urls = function(file, url, is_css, iri)
   local urls = {}
   local html = nil
-  
+
   downloaded[url] = true
 
   local function check(urla)
@@ -108,11 +98,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     local url = string.match(urla, "^([^#]+)")
     local url_ = string.gsub(string.match(url, "^(.-)%.?$"), "&amp;", "&")
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
-        and not (string.match(url_, "^https?://[^/]*kinja%-img%.com/") and downloaded[string.lower(url_)])
-        and not (string.match(url_, "/$") and downloaded[string.match(url_, "^(.+)/$")])
-        and not downloaded[string.match(url_, "^(.+)/+")]
-        and allowed(url_, origurl) then
-print(url)
+      and allowed(url_, origurl) then
       table.insert(urls, { url=url_ })
       addedtolist[url_] = true
       addedtolist[url] = true
@@ -130,22 +116,26 @@ print(url)
       check(newurl)
     elseif string.match(newurl, "^https?:\\/\\?/") then
       check(string.gsub(newurl, "\\", ""))
-    elseif string.match(newurl, "^\\/\\/") then
-      check(string.match(url, "^(https?:)")..string.gsub(newurl, "\\", ""))
-    elseif string.match(newurl, "^//") then
-      check(string.match(url, "^(https?:)")..newurl)
     elseif string.match(newurl, "^\\/") then
-      check(string.match(url, "^(https?://[^/]+)")..string.gsub(newurl, "\\", ""))
+      checknewurl(string.gsub(newurl, "\\", ""))
+    elseif string.match(newurl, "^//") then
+      check(urlparse.absolute(url, newurl))
     elseif string.match(newurl, "^/") then
-      check(string.match(url, "^(https?://[^/]+)")..newurl)
+      check(urlparse.absolute(url, newurl))
+    elseif string.match(newurl, "^%.%./") then
+      if string.match(url, "^https?://[^/]+/[^/]+/") then
+        check(urlparse.absolute(url, newurl))
+      else
+        checknewurl(string.match(newurl, "^%.%.(/.+)$"))
+      end
     elseif string.match(newurl, "^%./") then
-      checknewurl(string.match(newurl, "^%.(.+)"))
+      check(urlparse.absolute(url, newurl))
     end
   end
 
   local function checknewshorturl(newurl)
     if string.match(newurl, "^%?") then
-      check(string.match(url, "^(https?://[^%?]+)")..newurl)
+      check(urlparse.absolute(url, newurl))
     elseif not (string.match(newurl, "^https?:\\?/\\?//?/?")
         or string.match(newurl, "^[/\\]")
         or string.match(newurl, "^%./")
@@ -155,13 +145,20 @@ print(url)
         or string.match(newurl, "^android%-app:")
         or string.match(newurl, "^ios%-app:")
         or string.match(newurl, "^%${")) then
-      check(string.match(url, "^(https?://.+/)")..newurl)
+      check(urlparse.absolute(url, newurl))
     end
   end
 
   if allowed(url, nil) and status_code == 200
-      and not string.match(url, "^https?://[^/]*kinja%-img%.com") then
+    and not string.match(url, "^https?://[^/]*kinja%-img%.com")
+    and not string.match(url, "^https?://[^/]*akamaihd%.net/.+%.ts$")
+    and not string.match(url, "^https?://[^/]+/x%-kinja%-static/") then
     html = read_file(file)
+    if string.match(url, "^https?://[^/]*akamaihd%.net/.+%.m3u8$") then
+      for newurl in string.gsub(html, "([^\n]+)") do
+        check(urlparse.absolute(url, newurl))
+      end
+    end
     for newurl in string.gmatch(string.gsub(html, "&quot;", '"'), '([^"]+)') do
       checknewurl(newurl)
     end
@@ -193,26 +190,20 @@ end
 
 wget.callbacks.httploop_result = function(url, err, http_stat)
   status_code = http_stat["statcode"]
-  
+
   url_count = url_count + 1
   io.stdout:write(url_count .. "=" .. status_code .. " " .. url["url"] .. "  \n")
   io.stdout:flush()
 
   if status_code >= 300 and status_code <= 399 then
-    local newloc = string.match(http_stat["newloc"], "^([^#]+)")
-    if string.match(newloc, "^//") then
-      newloc = string.match(url["url"], "^(https?:)") .. string.match(newloc, "^//(.+)")
-    elseif string.match(newloc, "^/") then
-      newloc = string.match(url["url"], "^(https?://[^/]+)") .. newloc
-    elseif not string.match(newloc, "^https?://") then
-      newloc = string.match(url["url"], "^(https?://.+/)") .. newloc
-    end
-    if downloaded[newloc] == true or addedtolist[newloc] == true or not allowed(newloc, url["url"]) then
+    local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
+    if downloaded[newloc] == true or addedtolist[newloc] == true
+      or not allowed(newloc, url["url"]) then
       tries = 0
       return wget.actions.EXIT
     end
   end
-  
+
   if status_code >= 200 and status_code <= 399 then
     downloaded[url["url"]] = true
     downloaded[string.gsub(url["url"], "https?://", "http://")] = true
@@ -220,26 +211,27 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
 
   if abortgrab == true then
     io.stdout:write("ABORTING...\n")
+    io.stdout:flush()
     return wget.actions.ABORT
   end
-  
-  if status_code >= 500
-      or (status_code >= 400 and status_code ~= 404)
-      or status_code  == 0 then
+
+  if (status_code >= 401 and status_code ~= 404)
+    or status_code > 500
+    or status_code == 0 then
     io.stdout:write("Server returned "..http_stat.statcode.." ("..err.."). Sleeping.\n")
     io.stdout:flush()
-    local maxtries = 8
+    local maxtries = 10
     if not allowed(url["url"], nil) then
-        maxtries = 2
+      maxtries = 3
     end
-    if tries > maxtries then
+    if tries >= maxtries then
       io.stdout:write("\nI give up...\n")
       io.stdout:flush()
       tries = 0
-      if allowed(url["url"], nil) then
-        return wget.actions.ABORT
-      else
+      if maxtries == 3 then
         return wget.actions.EXIT
+      else
+        return wget.actions.ABORT
       end
     else
       os.execute("sleep " .. math.floor(math.pow(2, tries)))
@@ -259,17 +251,10 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
   return wget.actions.NOTHING
 end
 
-wget.callbacks.finish = function(start_time, end_time, wall_time, numurls, total_downloaded_bytes, total_download_time)
-  local file = io.open(item_dir..'/'..warc_file_base..'_data.txt', 'w')
-  for new, _ in pairs(discovered) do
-    file:write(new .. "\n")
-  end
-  file:close()
-end
-
 wget.callbacks.before_exit = function(exit_status, exit_status_string)
   if abortgrab == true then
     return wget.exits.IO_FAIL
   end
   return exit_status
 end
+

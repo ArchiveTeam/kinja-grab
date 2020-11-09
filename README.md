@@ -21,24 +21,25 @@ Running without a warrior
 -------------------------
 To run this outside the warrior, clone this repository, cd into its directory and run:
 
-    pip install --upgrade seesaw
+    python3 -m pip install setuptools wheel
+    python3 -m pip install --upgrade seesaw zstandard requests
     ./get-wget-lua.sh
 
 then start downloading with:
 
-    run-pipeline pipeline.py --concurrent 2 YOURNICKHERE
+    run-pipeline3 pipeline.py --concurrent 2 YOURNICKHERE
 
 For more options, run:
 
-    run-pipeline --help
+    run-pipeline3 --help
 
 If you don't have root access and/or your version of pip is very old, you can replace "pip install --upgrade seesaw" with:
 
-    wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py ; python get-pip.py --user ; ~/.local/bin/pip install --upgrade --user seesaw
+    wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py ; python3 get-pip.py --user ; ~/.local/bin/pip3 install --upgrade --user seesaw
 
 so that pip and seesaw are installed in your home, then run
 
-    ~/.local/bin/run-pipeline pipeline.py --concurrent 2 YOURNICKHERE
+    ~/.local/bin/run-pipeline3 pipeline.py --concurrent 2 YOURNICKHERE
 
 Running multiple instances on different IPs
 -------------------------------------------
@@ -49,39 +50,50 @@ Use the `--context-value` argument to pass in `bind_address=123.4.5.6` (replace 
 
 Example of running 2 threads, no web interface, and Wget binding of IP address:
 
-    run-pipeline pipeline.py --concurrent 2 YOURNICKHERE --disable-web-server --context-value bind_address=123.4.5.6
+    run-pipeline3 pipeline.py --concurrent 2 YOURNICKHERE --disable-web-server --context-value bind_address=123.4.5.6
 
 Distribution-specific setup
 -------------------------
 ### For Debian/Ubuntu:
 
+Package `libzstd-dev` version 1.4.4 is required which is currently available from `buster-backports`.
+
     adduser --system --group --shell /bin/bash archiveteam
-    apt-get update && apt-get install -y git-core libgnutls-dev lua5.1 liblua5.1-0 liblua5.1-0-dev screen python-dev python-pip bzip2 zlib1g-dev flex autoconf
-    pip install --upgrade seesaw
+    echo deb http://deb.debian.org/debian buster-backports main contrib > /etc/apt/sources.list.d/backports.list
+    apt-get update \
+    && apt-get install -y git-core libgnutls-dev lua5.1 liblua5.1-0 liblua5.1-0-dev screen bzip2 zlib1g-dev flex autoconf autopoint texinfo gperf lua-socket rsync automake pkg-config python3-dev python3-pip build-essential \
+    && apt-get -t buster-backports install zstd libzstd-dev libzstd1
+    python3 -m pip install setuptools wheel
+    python3 -m pip install --upgrade seesaw zstandard requests
     su -c "cd /home/archiveteam; git clone https://github.com/ArchiveTeam/kinja-grab.git; cd kinja-grab; ./get-wget-lua.sh" archiveteam
-    screen su -c "cd /home/archiveteam/kinja-grab/; run-pipeline pipeline.py --concurrent 2 --address '127.0.0.1' YOURNICKHERE" archiveteam
+    screen su -c "cd /home/archiveteam/kinja-grab/; run-pipeline3 pipeline.py --concurrent 2 --address '127.0.0.1' YOURNICKHERE" archiveteam
     [... ctrl+A D to detach ...]
 
 In __Debian Jessie, Ubuntu 18.04 Bionic and above__, the `libgnutls-dev` package was renamed to `libgnutls28-dev`. So, you need to do the following instead:
 
     adduser --system --group --shell /bin/bash archiveteam
-    apt-get update && apt-get install -y git-core libgnutls28-dev lua5.1 liblua5.1-0 liblua5.1-0-dev screen python-dev python-pip bzip2 zlib1g-dev flex autoconf
+    echo deb http://deb.debian.org/debian buster-backports main contrib > /etc/apt/sources.list.d/backports.list
+    apt-get update \
+    && apt-get install -y git-core libgnutls28-dev lua5.1 liblua5.1-0 liblua5.1-0-dev screen bzip2 zlib1g-dev flex autoconf autopoint texinfo gperf lua-socket rsync automake pkg-config python3-dev python3-pip build-essential \
+    && apt-get -t buster-backports install zstd libzstd-dev libzstd1
     [... pretty much the same as above ...]
 
 Wget-lua is also available on [ArchiveTeam's PPA](https://launchpad.net/~archiveteam/+archive/wget-lua) for Ubuntu.
 
-
-And you may also need to update your Python's warcio if you find screen detaching immediately after running the job in Ubuntu 18.04 Bionic and above:
-
-    pip install warcio --upgrade
-
 ### For CentOS:
 
-Ensure that you have the CentOS equivalent of bzip2 installed as well. You will the EPEL repository to be enabled.
+Ensure that you have the CentOS equivalent of bzip2 installed as well. You will need the EPEL repository to be enabled.
 
-    yum -y install autoconf automake flex gnutls-devel lua-devel python-pip zlib-devel
+    yum -y groupinstall "Development Tools"
+    yum -y install gnutls-devel lua-devel python-pip zlib-devel zstd libzstd-devel git-core gperf lua-socket luarocks texinfo git rsync gettext-devel
     pip install --upgrade seesaw
     [... pretty much the same as above ...]
+
+Tested with EL7 repositories.
+
+### For Fedora:
+
+The same as CentOS but with "dnf" instead of "yum". Did not successfully test compiling, so far.
 
 ### For openSUSE:
 
@@ -125,7 +137,7 @@ Ensure that you have the Arch equivalent of bzip2 installed as well.
 
 ### For FreeBSD:
 
-Honestly, I have no idea. `./get-wget-lua.sh` supposedly doesn't work due to differences in the `tar` that ships with FreeBSD. Another problem is the apparent absence of Lua 5.1 development headers. If you figure this out, please do let us know on IRC (irc.efnet.org #archiveteam).
+Honestly, I have no idea. `./get-wget-lua.sh` supposedly doesn't work due to differences in the `tar` that ships with FreeBSD. Another problem is the apparent absence of Lua 5.1 development headers. If you figure this out, please do let us know on IRC (irc.hackint.org #archiveteam).
 
 Troubleshooting
 =========================
@@ -168,5 +180,6 @@ Are you a developer? Help write code for us! Look at our [developer documentatio
 
 ### Other problems
 
-Have an issue not listed here? Join us on IRC and ask! We can be found at irc.efnet.org #gokinjagokinjago.
+Have an issue not listed here? Join us on IRC and ask! We can be found at hackint IRC [#gokinjagokinjago](https://webirc.hackint.org/#irc://irc.hackint.org/#gokinjagokinjago).
+
 
