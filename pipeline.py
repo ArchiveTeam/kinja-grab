@@ -50,10 +50,10 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201111.05'
+VERSION = '20201111.06'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'kinja'
-TRACKER_HOST = 'tracker.archiveteam.org'
+TRACKER_HOST = 'trackerproxy.archiveteam.org'
 
 
 ###########################################################################
@@ -226,7 +226,7 @@ project = Project(
 
 pipeline = Pipeline(
     CheckIP(),
-    GetItemFromTracker('http://%s/%s' % (TRACKER_HOST, TRACKER_ID), downloader,
+    GetItemFromTracker('https://%s/%s' % (TRACKER_HOST, TRACKER_ID), downloader,
         VERSION),
     PrepareDirectories(warc_prefix='kinja'),
     WgetDownload(
