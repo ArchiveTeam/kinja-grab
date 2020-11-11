@@ -37,9 +37,7 @@ if StrictVersion(seesaw.__version__) < StrictVersion('0.8.5'):
 WGET_AT = find_executable(
     'Wget+Lua',
     ['GNU Wget 1.20.3-at.20201030.01'],
-    [
-        './wget-at',
-    ]
+    ['./wget-at']
 )
 
 if not WGET_AT:
@@ -51,7 +49,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201110.01'
+VERSION = '20201111.01'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'tracker.archiveteam.org'
@@ -192,7 +190,10 @@ class WgetArgs(object):
             if base != 'kinja.com':
                 base += ',kinja.com'
             wget_args.extend(['--domains', base])
-            wget_args.extend(['--warc-header', 'x-wget-at-project-item-name: '+item_value])
+            wget_args.extend([
+                '--warc-item-name', item_name,
+                '--warc-header', 'x-wget-at-project-item-name: '+item_value
+            ])
             wget_args.append('https://' + item_value + '/')
             wget_args.append('https://' + item_value + '/robots.txt')
             wget_args.append('https://' + item_value + '/sitemap.xml')

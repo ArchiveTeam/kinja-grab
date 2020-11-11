@@ -1,5 +1,6 @@
 dofile("table_show.lua")
 dofile("urlcode.lua")
+JSON = (loadfile "JSON.lua")()
 local urlparse = require("socket.url")
 local http = require("socket.http")
 
@@ -14,7 +15,11 @@ local downloaded = {}
 local addedtolist = {}
 local abortgrab = false
 
+local discovered = {}
+
 for ignore in io.open("ignore-list", "r"):lines() do
+  io.stdout:write("lua-socket not corrently installed.\n")
+  io.stdout:flush()
   downloaded[ignore] = true
 end
 
@@ -62,6 +67,16 @@ allowed = function(url, parenturl)
     return false
   end]]
 
+  local match = string.match(url, "^https?://([^%.]+%.kinja%.com)/")
+  if match and match ~= item_value then
+    discovered[match] = true
+  end
+
+  if parenturl and string.match(parenturl, "/ajax/comments/")
+    and string.match(url, "^https?://[^/]+/[0-9]+$") then
+    return false
+  end
+
   if string.match(url, "^https?://([^/]+)") == item_value
     or string.match(url, "^https?://[^/]*kinja%-img%.com/")
     or string.match(url, "^https?://[^/]*akamaihd%.net/") then
@@ -72,15 +87,14 @@ allowed = function(url, parenturl)
 end
 
 wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_parsed, iri, verdict, reason)
-  local url = urlpos["url"]["url"]
+--[[  local url = urlpos["url"]["url"]
   local html = urlpos["link_expect_html"]
 
---[[  if (downloaded[url] ~= true and addedtolist[url] ~= true)
+  if (downloaded[url] ~= true and addedtolist[url] ~= true)
       and not (string.match(url, "^https?://[^/]*kinja%-img%.com/") and downloaded[string.lower(url)])
       and not (string.match(url, "/$") and downloaded[string.match(url, "^(.+)/$")])
       and (allowed(url, parent["url"]) or html == 0) then
     addedtolist[url] = true
-print(url)
     return true
   end]]
 
@@ -159,6 +173,49 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         check(urlparse.absolute(url, newurl))
       end
     end
+    local match = string.match(url, "/embed/comments/magma/([0-9]+)")
+    if match then
+      local ownerid = string.match(string.gsub(html, "\\x22", '"'), '"ownerId":"([0-9]+)"')
+      if not ownerid then
+        io.stdout:write("ownerId could not be found.\n")
+        io.stdout:flush()
+        abortgrab = true
+      end
+      checknewurl("/ajax/comments/views/curatedReplies/" .. match .. "?maxReturned=5&cache=true&sorting=top&userIds=1148658")
+      checknewurl("/ajax/comments/views/replies/" .. match .. "?startIndex=0&maxReturned=5&maxChildren=4&approvedOnly=true&cache=true&experimental=true&sorting=top")
+    end
+    if string.match(url, "/ajax/comments/views/replies/[0-9]+") then
+      local data = JSON:decode(html)
+      if not data then
+        io.stdout:write("Expected JSON data.\n")
+        io.stdout:flush()
+        abortgrab = true
+      end
+      nextpage = data["data"]
+      if nextpage then
+        local items = nextpage["items"]
+        if items then
+          for _, item in pairs(items) do
+            if item["children"]
+              and item["children"]["pagination"]
+              and item["children"]["pagination"]["next"] then
+              local postid = item["reply"]["id"]
+              local next_ = item["children"]["pagination"]["next"]
+              local start = "/ajax/comments/views/flatReplies/" .. tostring(postid) .. "?startIndex=" .. tostring(next_["startIndex"])
+              checknewurl(start .. "&maxReturned=100&approvedOnly=true&cache=true&sorting=top")
+              checknewurl(start .. "&maxReturned=" .. tostring(next_["maxReturned"]) .. "&approvedOnly=true&cache=true&sorting=top")
+            end
+          end
+        end
+      end
+      if nextpage["pagination"]
+        and nextpage["pagination"]["next"] then
+        nextpage = nextpage["pagination"]["next"]
+        newurl = string.gsub(url, "([%?&]startIndex=)[0-9]+", "%1" .. tostring(nextpage["startIndex"]))
+        newurl = string.gsub(newurl, "([%?&]maxReturned=)[0-9]+", "%1" .. tostring(nextpage["maxReturned"]))
+        check(newurl)
+      end
+    end
     for newurl in string.gmatch(string.gsub(html, "&quot;", '"'), '([^"]+)') do
       checknewurl(newurl)
     end
@@ -197,6 +254,12 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
 
   if status_code >= 300 and status_code <= 399 then
     local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
+    if url_count == 1 then
+      local site = string.match(newloc, "^https?://([^/]+)")
+      if site ~= item_value then
+        discovered[site] = true
+      end
+    end
     if downloaded[newloc] == true or addedtolist[newloc] == true
       or not allowed(newloc, url["url"]) then
       tries = 0
@@ -249,6 +312,37 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
   end
 
   return wget.actions.NOTHING
+end
+
+wget.callbacks.finish = function(start_time, end_time, wall_time, numurls, total_downloaded_bytes, total_download_time)
+  local new_items = nil
+  for site, _ in pairs(discovered) do
+    if new_items == nil then
+      new_items = "site:" .. site
+    else
+      new_items = new_items .. "\0site:" .. site
+    end
+  end
+
+  if new_items ~= nil then
+    local tries = 0
+    while tries < 10 do
+      local body, code, headers, status = http.request(
+        "http://blackbird-amqp.meo.ws:23038/kinja-e0vkal5szhf5paz/",
+        new_items
+      )
+      if code == 200 or code == 409 then
+        break
+      end
+      os.execute("sleep " .. tostring(math.floor(math.pow(2, tries))))
+      tries = tries + 1
+    end
+    if tries == 10 then
+      io.stdout:write("Could not report discovered items.\n")
+      io.stdout:flush()
+      abortgrab = true
+    end
+  end
 end
 
 wget.callbacks.before_exit = function(exit_status, exit_status_string)
