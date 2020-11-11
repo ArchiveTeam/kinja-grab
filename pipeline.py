@@ -50,7 +50,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201111.07'
+VERSION = '20201111.08'
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:64.0) Gecko/20100101 Firefox/64.0'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'trackerproxy.archiveteam.org'

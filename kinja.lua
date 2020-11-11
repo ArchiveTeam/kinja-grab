@@ -40,7 +40,7 @@ end
 
 allowed = function(url, parenturl)
   if string.match(url, "'+")
-    or string.match(url, "[<>\\%*%$;%^%[%],%(%){}]") then
+    or string.match(url, "[<>\\%*%$%^%[%]%(%){}]") then
     return false
   end
 
@@ -87,16 +87,17 @@ allowed = function(url, parenturl)
 end
 
 wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_parsed, iri, verdict, reason)
---[[  local url = urlpos["url"]["url"]
+  local url = urlpos["url"]["url"]
   local html = urlpos["link_expect_html"]
 
   if (downloaded[url] ~= true and addedtolist[url] ~= true)
-      and not (string.match(url, "^https?://[^/]*kinja%-img%.com/") and downloaded[string.lower(url)])
-      and not (string.match(url, "/$") and downloaded[string.match(url, "^(.+)/$")])
-      and (allowed(url, parent["url"]) or html == 0) then
+    and not (string.match(url, "^https?://[^/]*kinja%-img%.com/") and downloaded[string.lower(url)])
+    and not (string.match(url, "/$") and downloaded[string.match(url, "^(.+)/$")])
+    and (allowed(url, parent["url"]) or html == 0) then
     addedtolist[url] = true
+if string.match(url, "akamaihd") then print(url) end
     return true
-  end]]
+  end
 
   return false
 end
@@ -113,6 +114,7 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     local url_ = string.gsub(string.match(url, "^(.-)%.?$"), "&amp;", "&")
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
       and allowed(url_, origurl) then
+if string.match(url_, "akamaihd") then print(url_) end
       table.insert(urls, { url=url_ })
       addedtolist[url_] = true
       addedtolist[url] = true
@@ -169,8 +171,10 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     and not string.match(url, "^https?://[^/]+/x%-kinja%-static/") then
     html = read_file(file)
     if string.match(url, "^https?://[^/]*akamaihd%.net/.+%.m3u8$") then
-      for newurl in string.gsub(html, "([^\n]+)") do
-        check(urlparse.absolute(url, newurl))
+      for newurl in string.gmatch(html, "([^\n]+)") do
+        if not string.match(newurl, "^#") then
+          check(urlparse.absolute(url, newurl))
+        end
       end
     end
     local match = string.match(url, "/embed/comments/magma/([0-9]+)")
