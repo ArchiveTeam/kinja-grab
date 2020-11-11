@@ -18,7 +18,7 @@ import time
 import string
 import re
 
-import apt
+#import apt
 import seesaw
 from seesaw.externalprocess import WgetDownload
 from seesaw.pipeline import Pipeline
@@ -50,7 +50,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201111.04'
+VERSION = '20201111.05'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'tracker.archiveteam.org'
@@ -69,9 +69,9 @@ class CheckIP(SimpleTask):
 
     def process(self, item):
         if self._counter <= 0:
-            if not apt.Cache()['lua-socket'].is_installed:
-                item.log_output('lua-socket not installed.')
-                raise Exception('lua-socket not installed.')
+            #if not apt.Cache()['lua-socket'].is_installed:
+            #    item.log_output('lua-socket not installed.')
+            #    raise Exception('lua-socket not installed.')
 
             item.log_output('Checking IP address.')
             ip_set = set()
