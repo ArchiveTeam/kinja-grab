@@ -42,7 +42,8 @@ allowed = function(url, parenturl)
   if string.match(url, "'+")
     or string.match(url, "[<>\\%*%$%^%[%]%(%){}]")
     or string.match(url, "^https?://[^/]+/[^/]+[0-9]+/amp$")
-    or string.match(url, "^https?://[^/]+/5%.5%.2/?$") then
+    or string.match(url, "^https?://[^/]+/5%.5%.2/?$")
+    or string.match(url, "^https?://[^/]+/tag/") then
     return false
   end
 
