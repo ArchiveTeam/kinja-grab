@@ -50,7 +50,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201111.09'
+VERSION = '20201114.01'
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:64.0) Gecko/20100101 Firefox/64.0'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'trackerproxy.archiveteam.org'
@@ -198,7 +198,7 @@ class WgetArgs(object):
             ])
             wget_args.append('https://' + item_value + '/')
             wget_args.append('https://' + item_value + '/robots.txt')
-            wget_args.append('https://' + item_value + '/sitemap.xml')
+            #wget_args.append('https://' + item_value + '/sitemap.xml')
         else:
             raise Exception('Unknown item')
 

@@ -18,12 +18,12 @@ local abortgrab = false
 local discovered = {}
 
 for ignore in io.open("ignore-list", "r"):lines() do
-  io.stdout:write("lua-socket not corrently installed.\n")
-  io.stdout:flush()
   downloaded[ignore] = true
 end
 
 if urlparse == nil or http == nil then
+  io.stdout:write("lua-socket not corrently installed.\n")
+  io.stdout:flush()
   abortgrab = true
 end
 
@@ -40,7 +40,8 @@ end
 
 allowed = function(url, parenturl)
   if string.match(url, "'+")
-    or string.match(url, "[<>\\%*%$%^%[%]%(%){}]") then
+    or string.match(url, "[<>\\%*%$%^%[%]%(%){}]")
+    or string.match(url, "^https?://[^/]+/[^/]+[0-9]+/amp$") then
     return false
   end
 
@@ -282,7 +283,7 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     return wget.actions.ABORT
   end
 
-  if (status_code >= 400 and status_code ~= 404)
+  if (status_code >= 401 and status_code ~= 404)
     or status_code >= 500
     or status_code == 0 then
     io.stdout:write("Server returned "..http_stat.statcode.." ("..err.."). Sleeping.\n")
