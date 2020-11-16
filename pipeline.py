@@ -50,7 +50,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20201116.02'
+VERSION = '20201116.03'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'kinja'
 TRACKER_HOST = 'trackerproxy.archiveteam.org'
@@ -187,18 +187,29 @@ class WgetArgs(object):
         item['item_type'] = item_type
         item['item_value'] = item_value
 
-        if item_type == 'site':
-            base = re.search(r'([^\.]+\.[^\.]+)$', item_value).group(1)
+        wget_args.extend([
+            '--warc-item-name', item_name,
+            '--warc-header', 'x-wget-at-project-item-name: '+item_value
+        ])
+
+        if item_type in ('site', 'base'):
+            domain = item_value
+        elif item_type == 'partial':
+            domain, start, end = item_value.split(';')
+
+        if item_type in ('site', 'base', 'partial'):
+            base = re.search(r'([^\.]+\.[^\.]+)$', domain).group(1)
             if base != 'kinja.com':
                 base += ',kinja.com'
             wget_args.extend(['--domains', base])
-            wget_args.extend([
-                '--warc-item-name', item_name,
-                '--warc-header', 'x-wget-at-project-item-name: '+item_value
-            ])
-            wget_args.append('https://' + item_value + '/')
-            wget_args.append('https://' + item_value + '/robots.txt')
-            #wget_args.append('https://' + item_value + '/sitemap.xml')
+            if item_type in ('site', 'base'):
+                wget_args.append('https://' + domain + '/')
+                wget_args.append('https://' + domain + '/robots.txt')
+            if item_type == 'base':
+                wget_args.append('https://' + domain + '/sitemap.xml')
+            if item_type == 'partial':
+                wget_args.append('https://' + domain + '/sitemap_bydate.xml?startTime=' + start + '&endTime=' + end)
+            item['item_value'] = domain
         else:
             raise Exception('Unknown item')
 

@@ -44,7 +44,14 @@ allowed = function(url, parenturl)
     or string.match(url, "^https?://[^/]+/[^/]+[0-9]+/amp$")
     or string.match(url, "^https?://[^/]+/5%.5%.2/?$")
     or string.match(url, "^https?://[^/]+/tag/")
-    or string.match(url, "^https?://[^/]+/search$") then
+    or string.match(url, "^https?://[^/]+/search$")
+    or (
+      item_type == "partial"
+      and (
+        string.match(url, "^https?://[^/]+/?$")
+        or string.match(url, "^https?://[^/]+/%?")
+      )
+    ) then
     return false
   end
 
@@ -59,21 +66,24 @@ allowed = function(url, parenturl)
     tested[s] = tested[s] + 1
   end
 
---[[  if string.match(url, "%?startTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+&endTime=[0-9]+%-[0-9]+%-[0-9]+T[0-9]+:[0-9]+:[0-9]+$") then
-    local start_time, end_time = string.match(url, "%?startTime=([0-9%-T:]+)&endTime=([0-9%-T:]+)$")
-    start_time = string.gsub(start_time, "[%-T:]", "")
-    end_time = string.gsub(end_time, "[%-T:]", "")
-    discovered["posts:" .. item_value .. ":" .. start_time .. ":" .. end_time] = true
+  local start_time, end_time = string.match(url, "%?startTime=([0-9%-T:]+)&endTime=([0-9%-T:]+)$")
+  if start_time and end_time then
+    discovered["partial:" .. item_value .. ";" .. start_time .. ";" .. end_time] = true
+    if parenturl ~= nil then
+      return false
+    end
   end
 
-  if parenturl ~= nil and string.match(parenturl, "%?startTime=[0-9%-T:]+&endTime=[0-9%-T:]+$") then
-    downloaded[url] = true
+  if parenturl
+    and (item_type == "partial" or item_type == "base")
+    and string.match(url, "^https?://[^/]+/[^/]*[0-9]+$")
+    and not string.match(parenturl, "%?startTime=[^&]+&endTime=") then
     return false
-  end]]
+  end
 
   local match = string.match(url, "^https?://([^%.]+%.kinja%.com)/")
   if match and match ~= item_value then
-    discovered[match] = true
+    discovered["site:" .. match] = true
   end
 
   if parenturl and string.match(parenturl, "/ajax/comments/")
@@ -99,7 +109,6 @@ wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_pars
     and not (string.match(url, "/$") and downloaded[string.match(url, "^(.+)/$")])
     and (allowed(url, parent["url"]) or html == 0) then
     addedtolist[url] = true
-if string.match(url, "akamaihd") then print(url) end
     return true
   end
 
@@ -118,7 +127,6 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     local url_ = string.gsub(string.match(url, "^(.-)%.?$"), "&amp;", "&")
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
       and allowed(url_, origurl) then
-if string.match(url_, "akamaihd") then print(url_) end
       table.insert(urls, { url=url_ })
       addedtolist[url_] = true
       addedtolist[url] = true
@@ -265,7 +273,7 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     if url_count == 1 then
       local site = string.match(newloc, "^https?://([^/]+)")
       if site ~= item_value then
-        discovered[site] = true
+        discovered["site:" .. site] = true
       end
     end
     if downloaded[newloc] == true or addedtolist[newloc] == true
@@ -291,8 +299,9 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     or status_code == 0 then
     io.stdout:write("Server returned "..http_stat.statcode.." ("..err.."). Sleeping.\n")
     io.stdout:flush()
-    local maxtries = 6
+    local maxtries = 4
     if string.match(url["url"], "^https?://[^/]*akamaihd%.net/")
+      or status_code == 500
       or not allowed(url["url"], nil) then
       maxtries = 3
     end
@@ -326,10 +335,11 @@ end
 wget.callbacks.finish = function(start_time, end_time, wall_time, numurls, total_downloaded_bytes, total_download_time)
   local new_items = nil
   for site, _ in pairs(discovered) do
+    print(site)
     if new_items == nil then
-      new_items = "site:" .. site
+      new_items = site
     else
-      new_items = new_items .. "\0site:" .. site
+      new_items = new_items .. "\0" .. site
     end
   end
 
