@@ -43,7 +43,8 @@ allowed = function(url, parenturl)
     or string.match(url, "[<>\\%*%$%^%[%]%(%){}]")
     or string.match(url, "^https?://[^/]+/[^/]+[0-9]+/amp$")
     or string.match(url, "^https?://[^/]+/5%.5%.2/?$")
-    or string.match(url, "^https?://[^/]+/tag/") then
+    or string.match(url, "^https?://[^/]+/tag/")
+    or string.match(url, "^https?://[^/]+/search$") then
     return false
   end
 
@@ -290,8 +291,9 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     or status_code == 0 then
     io.stdout:write("Server returned "..http_stat.statcode.." ("..err.."). Sleeping.\n")
     io.stdout:flush()
-    local maxtries = 10
-    if not allowed(url["url"], nil) then
+    local maxtries = 6
+    if string.match(url["url"], "^https?://[^/]*akamaihd%.net/")
+      or not allowed(url["url"], nil) then
       maxtries = 3
     end
     if tries >= maxtries then
